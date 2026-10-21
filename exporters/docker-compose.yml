@@ -1,0 +1,41 @@
+name: glm53-exporters
+
+services:
+  glm53-dcgm-exporter:
+    image: ${DCGM_EXPORTER_IMAGE:?set DCGM_EXPORTER_IMAGE in .env}
+    container_name: glm53-dcgm-exporter
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - SYS_ADMIN
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      DCGM_EXPORTER_LISTEN: ":9400"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  glm53-node-exporter:
+    image: ${NODE_EXPORTER_IMAGE:?set NODE_EXPORTER_IMAGE in .env}
+    container_name: glm53-node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=:9100
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

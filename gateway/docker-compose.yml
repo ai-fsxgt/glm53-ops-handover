@@ -1,0 +1,56 @@
+services:
+  glm53-etcd:
+    image: ${ETCD_IMAGE:?set ETCD_IMAGE in .env}
+    container_name: glm53-etcd
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - /usr/local/bin/etcd
+      - --name=glm53-etcd
+      - --data-dir=/var/lib/etcd/data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://${GATEWAY_IP:?set GATEWAY_IP in .env}:2379
+      - --listen-peer-urls=http://127.0.0.1:2380
+      - --initial-advertise-peer-urls=http://127.0.0.1:2380
+      - --initial-cluster=glm53-etcd=http://127.0.0.1:2380
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  glm53-frontend:
+    image: ${SGLANG_IMAGE:?set SGLANG_IMAGE in .env}
+    container_name: glm53-frontend
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    depends_on:
+      - glm53-etcd
+    volumes:
+      # 入口只读取分词器、聊天模板等小文件，路径必须与推理节点一致
+      - "${MODEL_DIR:?set MODEL_DIR in .env}:/models/glm-5.3:ro"
+    environment:
+      ETCD_ENDPOINTS: http://127.0.0.1:2379
+      DYN_ROUTER_MODE: kv
+      DYN_HTTP_PORT: "${HTTP_PORT:-8000}"
+    command:
+      - python3
+      - -m
+      - dynamo.frontend
+      - --trust-remote-code
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:${HTTP_PORT:-8000}/health", timeout=5)
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

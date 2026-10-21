@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: glm53
+    orgId: 1
+    folder: GLM-5.3
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards

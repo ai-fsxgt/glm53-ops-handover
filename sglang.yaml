@@ -1,0 +1,43 @@
+# 基于 NVIDIA Dynamo GLM-5.3 H200 配方（recipes/glm-5.3/sglang/agg-h200-agentic），结合原 vLLM 配置调优
+model-path: /models/glm-5.3
+served-model-name: glm-5.3
+trust-remote-code: true
+quantization: fp8
+kv-cache-dtype: fp8_e4m3
+
+# 与原 vLLM 一致：256K 上下文、最多 128 个并发请求
+context-length: 262144
+max-running-requests: 128
+# CUDA Graph 只需覆盖 128 并发（默认 512），省下的显存留给 KV 缓存
+cuda-graph-max-bs: 128
+mem-fraction-static: 0.90
+# H20 算力较低，按 8K 分块预填充，减少长请求对其他请求生成的卡顿（与原 vLLM 长预填充阈值一致）
+chunked-prefill-size: 8192
+
+# MTP 投机解码，沿用配方参数（官方实测平均接受长度 2.69）
+speculative-algorithm: EAGLE
+speculative-num-steps: 3
+speculative-eagle-topk: 1
+speculative-num-draft-tokens: 4
+
+tensor-parallel-size: 8
+ep-size: 8
+attention-backend: dsa
+enable-prefill-cp: true
+cp-strategy: interleave
+moe-a2a-backend: none
+fp8-gemm-backend: flashinfer_deepgemm
+
+# HiCache：显存放不下的缓存转存到内存。DSA 索引另需约 20%，每卡实际约 180GB，8 卡共约 1.44TB（本机内存 2TB）
+enable-hierarchical-cache: true
+hicache-size: 150
+
+watchdog-timeout: 3600
+enable-metrics: true
+kv-events-config:
+  publisher: zmq
+  topic: kv-events
+  endpoint: tcp://*:5557
+model-loader-extra-config:
+  enable_multithread_load: true
+  num_threads: 32
